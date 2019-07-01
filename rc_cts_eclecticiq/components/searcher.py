@@ -9,7 +9,8 @@ import urllib
 import datetime
 
 from circuits import BaseComponent, handler
-from rc_cts import searcher_channel, Hit, NumberProp, StringProp, U riProp
+from rc_cts import searcher_channel, Hit, NumberProp, StringProp, UriProp
+
 
 LOG = logging.getLogger(__name__)
 
@@ -57,6 +58,8 @@ class EclecticIQLookup(BaseComponent):
     # Register this as an async searcher for the URL /<root>/example
     channel = searcher_channel("eiq")
 
+
+
     @handler("net.ip", "net.name", "email", "email.header", "email.header.sender_address", "email.header.to", "hash.md5", "hash.sha1", "hash.sha256", "hash.sha512", "net.uri", "net.uri.path")
     def _lookup(self, event, *args, **kwargs):
 
@@ -67,7 +70,7 @@ class EclecticIQLookup(BaseComponent):
         artifact_type = event.artifact['type']
         artifact_value = event.artifact['value']
         LOG.info("_lookup started for Artifact Type {0} - Artifact Value {1}".format(artifact_type, artifact_value))
-
+        #web_pdb.set_trace()
         # Generate request to Platform and get response in the hits dict
 
         hits = {}
@@ -208,7 +211,7 @@ class EclecticIQLookup(BaseComponent):
         else:
             return
 
-        indicator_path = self.eclecticiq_url + self.api_path["get_entity_api_url"] + '?q=extracts.value:"' + urllib.quote_plus(value) + '"&type=indicator'
+        indicator_path = self.eclecticiq_url + self.api_path["get_entity_api_url"] + '?q=extracts.value:"' + urllib.quote_plus(value) + '"&type='
         rr = self._send_api_request(
             'get',
             path=indicator_path,
@@ -217,20 +220,37 @@ class EclecticIQLookup(BaseComponent):
         indicator_response = json.loads(rr.text)
 
         if indicator_response["hits"]["total"] > 0:
-            entity_name = ''
-            for k in range(0, indicator_response["hits"]["total"]):
-                if k is not 0:
-                    entity_name += ", "
-                entity_name += indicator_response["hits"]["hits"][k]["_source"]["data"]["title"]
-        else:
-            entity_name = "N/A"
-            pass
+            entities = list()
+            for item in indicator_response["hits"]["hits"]:
 
-        return Hit(
-            StringProp(name="Connected Entities", value=entity_name),
-            StringProp(name="Last Updated", value=last_updated),
-            StringProp(name="Maliciousness", value=maliciousness),
-            UriProp(name="EclecticIQ Platform Link", value=platform_link))
+                ent_dict = {"type": str((item["_source"]["data"]["type"])).capitalize(),
+                          "title": item["_source"]["data"]["title"],
+                          "tags": ""}
+                tags = []
+
+                try:
+                    if len(item["_source"]["tags"]) > 0:
+                        for i in item["_source"]["tags"]:
+                            tags.append(i)
+                except KeyError:
+                    pass
+                ent_dict["tags"] = tags
+                entities.append(ent_dict)
+        else:
+            entities = "N/A"
+            pass
+        hit_str = "Hit("
+        i=1
+        for item in entities:
+            if item["type"] != "Eclecticiq-sighting":
+                hit_str += "StringProp(name='Entity" + str(i) + ": " + str(item["type"]) + "'" + ", value='" + item["title"] + " (" + ", ".join(map(str, tags)) + ")'),"
+                i += 1
+
+        hit_str += "StringProp(name='Last Updated', value=last_updated),\
+        StringProp(name='Maliciousness', value=maliciousness),\
+        UriProp(name='EclecticIQ Platform Link', value=platform_link))"
+
+        return eval(hit_str)
 
     def _get_source_group_uid(self, group_name):
         LOG.info(
@@ -270,7 +290,6 @@ class EclecticIQLookup(BaseComponent):
         today = datetime.datetime.utcnow().date()
 
         today_begin = self.format_ts(datetime.datetime(today.year, today.month, today.day, 0, 0, 0))
-        today_end = self.format_ts(datetime.datetime(today.year, today.month, today.day, 23, 59, 59))
 
         ts = self.format_ts(datetime.datetime.utcnow())
 
@@ -291,7 +310,7 @@ class EclecticIQLookup(BaseComponent):
                 "security_control": {
                     "type": "information-source",
                     "identity": {
-                        "name": "EclecticIQ Platform App for Splunk",
+                        "name": "EclecticIQ Platform App for IBM Resilient",
                         "type": "identity"
                     },
                     "time": {

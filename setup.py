@@ -23,7 +23,8 @@ setup(
     entry_points={
         # Register the component with resilient_circuits
         "resilient.circuits.components": [
-            "EclecticIQLookup = rc_cts_eclecticiq.components.searcher:EclecticIQLookup"
+            "EclecticIQLookup = rc_cts_eclecticiq.components.searcher:EclecticIQLookup",
+            "TestActions = rc_cts_eclecticiq.components.action:EclrecticIQActions"
         ],
         "resilient.circuits.configsection": ["gen_config = rc_cts_eclecticiq.util.config:config_section_data"],
     }
